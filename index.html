@@ -48,6 +48,15 @@
             border-radius: 5px;
             cursor: pointer;
         }
+        #start-button2 {
+            font-size: 20px;
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
         #start-button:hover {
             background-color: #218838;
         }
@@ -65,13 +74,19 @@
             １ラウンドスコア：MAX10000点～MIN1点<br>
             ５ラウンド合計　：MAX50000点
         </div>
-        <button id="start-button" onclick="startGame()">スタート</button>
+        <button id="start-button" onclick="startGame()">☆ガチンコモード☆</button>
+        <button id="start-button2" onclick="startGame2()">ランドマークモード(初心者・県外者向け)</button>
     </div>
 
     <script>
         function startGame() {
             // ゲームのHTMLファイルに遷移
             window.location.href = 'Fukguesser.html'; // ゲーム用HTMLファイルにリンク
+        }
+
+        function startGame2() {
+            // ゲームのHTMLファイルに遷移
+            window.location.href = 'Landmark.html'; // ゲーム用HTMLファイルにリンク
         }
     </script>
 </body>
