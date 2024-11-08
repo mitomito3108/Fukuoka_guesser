@@ -29,9 +29,42 @@
             background-color: green;
             color: white;
             border: none;
-            font-size: 16px;
+            font-size: 18px;
             cursor: pointer;
         }
+
+        #hint-button {
+            position: fixed;
+            bottom: 15%;
+            left: 10px;
+            width: 10vw; /* 画面の横の10分の1 */
+            height: 10vh; /* 画面の縦の5分の1 */
+            z-index: 1500;
+            background-color: orange;
+            color: white;
+            border: none;
+            font-size: 18px;
+            text-align: center;
+            cursor: pointer;
+            
+        }
+
+        #hint-window {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 500px;
+            padding: 20px;
+            background-color: white;
+            border: 2px solid black;
+            border-radius: 10px;
+            z-index: 2000;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+
         #message-window {
             position: absolute;
             top: 10%;
@@ -121,9 +154,9 @@
     <div id="street-view"></div>
     <div id="map"></div>
     <button id="decide-button">この場所に決定</button>
-    <div id="message-window" style="display:none;">
-        <!-- <div id="message-content"></div> -->
-    </div>
+    <div id="message-window" style="display:none;"><!-- <div id="message-content"></div> --> </div>
+    <div id="hint-window" style="display:none;"></div>
+    <button id="hint-button">ヒント</button>
     <button id="next-button">次のラウンドに進む</button>
     <div id="line-map"></div>
     <div id="timer-score-container">
@@ -415,6 +448,75 @@
             document.getElementById('message-window').style.display = 'none';
         });
 
+
+
+    // ヒント機能の実装
+    document.getElementById('hint-button').addEventListener('click', function() {
+        // ランダムロケーションの緯度と経度を取得
+        const lat = randomLocation.lat;
+        const lng = randomLocation.lng;
+
+        // Google Maps Geocoding APIを使用して住所情報を取得
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ location: { lat: lat, lng: lng } }, function(results, status) {
+            if (status === 'OK') {
+                if (results[0]) {
+                    const address = results[0].formatted_address;
+
+                    // 住所に福岡市の区名やその他の市町村名が含まれているかを確認し、画像を設定
+                    let imageUrl;
+                    if (address.includes('博多区')) {
+                        imageUrl = 'hakata_hint.jpg';  // 博多区のヒント画像
+                    } else if (address.includes('中央区')) {
+                        imageUrl = 'chuo_hint.jpg';  // 中央区のヒント画像
+                    } else if (address.includes('南区')) {
+                        imageUrl = 'minami_hint.jpg';  // 南区のヒント画像
+                    } else if (address.includes('東区')) {
+                        imageUrl = 'higashi_hint.jpg';  // 東区のヒント画像
+                    } else if (address.includes('西区')) {
+                        imageUrl = 'nishi_hint.jpg';  // 西区のヒント画像
+                    } else if (address.includes('城南区')) {
+                        imageUrl = 'jonan_hint.jpg';  // 城南区のヒント画像
+                    } else if (address.includes('早良区')) {
+                        imageUrl = 'sawara_hint.jpg';  // 早良区のヒント画像
+                    } else if (address.includes('糟屋郡')) {
+                        imageUrl = 'kasuya_hint.jpg';  // 糟屋郡のヒント画像
+                    } else if (address.includes('大野城市')) {
+                        imageUrl = 'onojo_hint.jpg';  // 大野城市のヒント画像
+                    } else if (address.includes('春日市')) {
+                        imageUrl = 'kasuga_hint.jpg';  // 春日市のヒント画像
+                    } else if (address.includes('糸島市')) {
+                        imageUrl = 'itoshima_hint.jpg';  // 糸島市のヒント画像
+                    } else {
+                        imageUrl = null;
+                    }
+
+                    // メッセージウィンドウにヒント画像を表示
+                    if (imageUrl) {
+                        showHintWindow(`<img src="${imageUrl}" alt="ヒント画像" style="width: 25vw; height: auto;">`);
+                    } else {
+                        showHintWindow('<p>住所なし（海上・山中が正解となっています）</p>');
+                    }
+                } else {
+                    showHintWindow('<p>ヒントを取得できませんでした</p>');
+                }
+            } else {
+                showHintWindow('<p>ジオコーディングに失敗しました</p>');
+            }
+        });
+    });
+
+    // showHintWindow関数を利用してヒント画像をポップアップで表示
+    function showHintWindow(content) {
+        const messageWindow = document.getElementById('hint-window');
+        messageWindow.innerHTML = content;
+        messageWindow.style.display = 'block';
+
+        // 7.5秒後に自動で閉じるように設定
+        setTimeout(() => {
+            messageWindow.style.display = 'none';
+        }, 7500);
+    }
         
        
     </script>
