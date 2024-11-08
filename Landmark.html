@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>福岡ランドマークモード</title>
+    <style>
+        #street-view {
+            height: 100vh;
+            width: 100%;
+            position: relative;
+        }
+        #map {
+            height: 25vh;
+            width: 25vw;
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            border: 2px solid black;
+            z-index: 1000;
+        }
+        #decide-button {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            width: 10vw;
+            height: 10vh;
+            z-index: 1500;
+            background-color: green;
+            color: white;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #message-window {
+            position: absolute;
+            top: 15%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 500px;
+            padding: 20px;
+            background-color: white;
+            border: 2px solid black;
+            border-radius: 10px;
+            z-index: 2000;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            display: none;
+        }
+        #next-button {
+            position: absolute; 
+            top: 80%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 64px;
+            padding: 8px 24px;
+            font-size: 16px;
+            color: #fff;
+            text-align: center;
+            background-color: #6fa24a;
+            border-radius: 32px;
+            z-index: 2000;
+            display: none; /* 初期状態では非表示 */
+        }
+        #line-map {
+            height: 50vh;
+            width: 50vw;
+            position: absolute;
+            top: 20%;
+            left: 25%;
+            border: 2px solid black;
+            z-index: 1000;
+            background-color: white;
+            display: none; /* 初期状態では非表示 */
+        }
+        #timer-score-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        #timer {
+            font-size: 18px;
+        }
+        #score {
+            font-size: 18px;
+            margin-top: 10px;
+        }
+        #roundnumber {
+            position: absolute;
+            top: 10px;
+            left: 0px;
+            width: 200px;
+            height: 60px;
+            z-index: 1500;
+            background-color: white;
+            border: none;
+            text-align: center;
+            line-height: 60px;
+            font-size: 20px;
+            cursor: pointer;
+            border-radius: 32px;
+        }
+    </style>
+</head>
+<body>
+    <div id="roundnumber"></div>
+    <div id="street-view"></div>
+    <div id="map"></div>
+    <button id="decide-button">この場所に決定</button>
+    <div id="message-window"></div>
+    <button id="next-button">次のラウンドに進む</button>
+    <div id="line-map"></div>
+    <div id="timer-score-container">
+        <div id="timer">Time: 0s</div>
+        <!-- <div id="score">Score: 0</div> -->
+    </div>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBXskYss6vmHiYblfLtD2kpuY-ELrHRr2c&libraries=geometry&callback=initMapAndStreetView" async defer></script>
+    <script>
+        let panorama;
+        let map;
+        let marker;
+        let randomLocation;
+        let lineMap;
+        let startTime;
+        let timerInterval;
+        let totalScore = 0;
+        let round = 1;
+        const maxRounds = 5;
+        let messageWindow;
+        let lineMapDiv;
+        let selectedname
+
+        // ランドマークの緯度経度のリスト
+        const landmarks = [
+        { name: '福岡タワー', lat: 33.5926, lng: 130.3516 },
+        { name: '福岡市役所', lat: 33.5902, lng: 130.4013 },
+        { name: '大濠公園', lat: 33.5894, lng: 130.3762 },
+        { name: 'キャナルシティ博多', lat: 33.590, lng: 130.4110 },
+        { name: '福岡市博物館・福岡市総合図書館', lat: 33.5889, lng: 130.3524 },
+        { name: '博多リバレインモール・福岡アジア美術館', lat: 33.5947, lng: 130.4063 },
+        { name: '福岡城跡', lat: 33.5845, lng: 130.3831 },
+        { name: 'マリンメッセ福岡', lat: 33.6075, lng: 130.4036 },
+        { name: '警固公園', lat: 33.5882, lng: 130.3992 },
+        { name: 'ベイサイドプレイス博多・博多ポートタワー', lat: 33.6046, lng: 130.3979 },
+        { name: '福岡市動植物園', lat: 33.5724, lng: 130.3903 },
+        { name: '太宰府天満宮', lat: 33.5201, lng: 130.5347 },
+        { name: '海の中道～志賀島', lat: 33.6594, lng: 130.3243 },
+        { name: '海の中道海浜公園', lat: 33.6550, lng: 130.3542 },
+        { name: '福岡県庁・東公園', lat: 33.6058, lng: 130.4189 },
+        { name: '福岡市科学館', lat: 33.5774, lng: 130.3774 },
+        { name: '博多駅前', lat: 33.5902, lng: 130.4188 },
+        { name: 'みずほPayPayドーム福岡', lat: 33.5942, lng: 130.3629 },
+        { name: '二見ヶ浦', lat: 33.6389, lng: 130.1973 },
+        { name: 'マリンワールド', lat: 33.6616, lng: 130.3633 }
+        ];
+
+        function initMapAndStreetView() {
+            setupGame();
+        }
+
+        function setupGame() {
+            document.getElementById('roundnumber').textContent = `ラウンド: ${round}`;
+        
+            function getRandomLandmark() {
+            const randomIndex = Math.floor(Math.random() * landmarks.length);
+            return landmarks[randomIndex];
+            };
+
+            const selectedLandmark = getRandomLandmark();
+            randomLocation = { lat: selectedLandmark.lat, lng: selectedLandmark.lng };
+            sessionStorage.setItem(`round${round}_location`, JSON.stringify(randomLocation));
+            selectedname = selectedLandmark.name
+ 
+            // ストリートビューのパノラマを設定
+            panorama = new google.maps.StreetViewPanorama(
+                document.getElementById('street-view'), {
+                    position: randomLocation,
+                    pov: {
+                        heading: 34,
+                        pitch: 10
+                    }
+                });
+            
+            let streetViewService = new google.maps.StreetViewService();
+            streetViewService.getPanorama({ location: randomLocation, radius: 1000 }, processSVData);
+
+            function processSVData(data, status) {
+                if (status === 'OK') {
+                    panorama.setPosition(data.location.latLng);
+                    panorama.setPov({ heading: 270, pitch: 0 });
+                    panorama.setVisible(true);
+                } else {
+                    alert('ストリートビューが利用できません。');
+                }
+            }
+
+            const mapCenter = { lat: 33.5900684, lng: 130.4016776 };
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: mapCenter,
+                zoom: 16
+            });
+
+            marker = new google.maps.Marker({
+                position: mapCenter,
+                map: map
+            });
+
+            map.addListener('click', function(event) {
+                marker.setPosition(event.latLng);
+                map.panTo(event.latLng);
+            });
+
+            startTime = new Date();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function showFullScreenMap() {
+            lineMapDiv = document.getElementById('line-map');
+            lineMapDiv.style.display = 'block';
+
+            lineMap = new google.maps.Map(lineMapDiv, {
+                center: randomLocation,
+                zoom: 14
+            });
+
+            new google.maps.Marker({
+                position: randomLocation,
+                map: lineMap,
+                label: "正解"
+            });
+
+            new google.maps.Marker({
+                position: marker.getPosition(),
+                map: lineMap,
+                label: ""
+            });
+
+            const line = new google.maps.Polyline({
+                path: [randomLocation, marker.getPosition()],
+                geodesic: true,
+                strokeColor: '#FF0000',
+                strokeOpacity: 1.0,
+                strokeWeight: 2,
+                map: lineMap
+            });
+        }
+
+
+
+        // function calculateDistance() {
+        //     const markerPosition = marker.getPosition();
+        //     const distance = google.maps.geometry.spherical.computeDistanceBetween(
+        //         new google.maps.LatLng(randomLocation.lat, randomLocation.lng),
+        //         markerPosition
+        //     );
+
+        //     const timeTaken = Math.floor((new Date() - startTime) / 1000);
+        //     const distanceScore = getDistanceScore(distance);
+        //     const timeScore = getTimeScore(timeTaken);
+        //     const roundScore = distanceScore + timeScore; // スコア計算
+        //     totalScore += roundScore;
+
+        //     return { roundScore, distanceScore, timeScore };
+        // }
+
+        function updateTimer() {
+            const timeElapsed = Math.floor((new Date() - startTime) / 1000);
+            document.getElementById('timer').innerText = `Time: ${timeElapsed}s`;
+        }
+
+        // function getDistanceScore(distance) {
+        //     if (distance <= 100) return 100;
+        //     if (distance <= 200) return 90;
+        //     if (distance <= 300) return 80;
+        //     if (distance <= 500) return 70;
+        //     if (distance <= 750) return 60;
+        //     if (distance <= 1000) return 50;
+        //     if (distance <= 2000) return 25;
+        //     if (distance <= 5000) return 10;
+        //     if (distance <= 10000) return 5;
+        //     return 1;
+        // }
+
+        // function getTimeScore(time) {
+        //     if (time <= 30) return 100;
+        //     if (time <= 60) return 80;
+        //     if (time <= 90) return 60;
+        //     if (time <= 120) return 40;
+        //     if (time <= 180) return 20;
+        //     return 1;
+        // }
+            function playScoreSound(score) {
+                let sound;
+                if (score >= 5001) {
+                    sound = new Audio('high-score.mp3'); // 高得点用の音声
+                } else if (score >= 1001) {
+                    sound = new Audio('medium-score.mp3'); // 中得点用の音声
+                } else {
+                    sound = new Audio('low-score.mp3'); // 低得点用の音声
+                }
+                sound.play();
+            }
+
+
+        function endGame() {
+            // totalScoreをsessionStorageに保存
+            sessionStorage.setItem('totalScore', totalScore);
+            // scorepage.htmlにリダイレクト
+            window.location.href = 'scorepageLandmark.html';
+        }
+
+        // function showFinalScore() {
+        //     // 最終スコアを新しいページで派手に表示
+        //     const finalPage = window.open("", "_blank");
+        //     finalPage.document.write(`
+        //         <html>
+        //         <head><title>Final Score</title></head>
+        //         <body style="display: flex; justify-content: center; align-items: center; height: 100vh; background-color: black; color: white; font-size: 36px;">
+        //             <div>
+        //                 <h1>あなたの福岡市愛は・・・</h1>
+        //                 <h2>Total Score: ${totalScore}点です！</h2>
+        //             </div>
+        //         </body>
+        //         </html>
+        //     `);
+        //     finalPage.document.close();
+        // }
+
+        // ボタンクリックで直線距離を計算して表示し、ラインを描画するマップを表示
+        document.getElementById('decide-button').addEventListener('click', function() {
+                   
+
+           
+            (async()=>{
+
+                // //音声
+                // const uttr = new SpeechSynthesisUtterance();
+                // voices = speechSynthesis.getVoices().filter((v) => v.lang === 'ja-JP');
+                // // 声を選択
+                // uttr.voice = voices[2];
+                // // 文章を設定
+                // uttr.text = "いまから福岡げっさーをはじめます";
+                // // 速度 0.1-10
+                // uttr.rate = 1.5
+                // // 高さ 0-2
+                // uttr.pitch = 2
+                // // 音量 0-1
+                // uttr.volume = 1
+                
+                // speechSynthesis.speak(uttr);
+
+            clearInterval(timerInterval); // タイマーを停止
+            showFullScreenMap();
+            // calculateDistance();
+
+            const nextbutton = document.getElementById('next-button');
+            nextbutton.style.display = 'block'; 
+            showMessageWindow(`地点名：「 ${selectedname}」`);
+
+            const sleep = (time) => new Promise((resolve) => setTimeout(resolve, time));
+            await sleep(400);
+            
+
+            playScoreSound(roundScore);
+            })();
+
+            
+        });
+
+        function showMessageWindow(message) {
+            messageWindow = document.getElementById('message-window');
+            messageWindow.innerHTML = message;
+            messageWindow.style.display = 'block';
+        }
+        
+        // 次に進むボタンで次のゲームに進む
+        document.getElementById('next-button').addEventListener('click', function() {
+
+            if (round < maxRounds) {
+                round++;
+                setupGame(); // 次のラウンドを開始
+            } else {
+                endGame();
+
+            }
+            document.getElementById('next-button').style.display = 'none';
+            document.getElementById('line-map').style.display = 'none';
+            document.getElementById('message-window').style.display = 'none';
+        });
+
+        
+       
+    </script>
+
