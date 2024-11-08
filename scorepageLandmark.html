@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final Score & Nearby Spots</title>
+
+    <!-- Google Fonts: かわいいフォントを追加 -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1, h2 {
+            color: #5c85d6;
+        }
+        .rank {
+            font-size: 36px;
+            padding: 10px 20px;
+            border-radius: 10px;
+            color: white;
+        }
+        .rank1 {
+            background-color: #FFD700; /* ゴールド */
+        }
+        .rank2 {
+            background-color: #C0C0C0; /* シルバー */
+        }
+        .rank3 {
+            background-color: #CD7F32; /* ブロンズ */
+        }
+        .content-wrapper {
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+            padding: 20px;
+        }
+        .spot-info {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .spot-info h3 {
+            margin: 0;
+            color: #ff6f61;
+        }
+        .spot-info p {
+            margin: 5px 0;
+        }
+        .spot-image {
+            max-width: 100%;
+            border-radius: 10px;
+        }
+        .rating {
+            font-size: 20px;
+            color: #ff9800;
+        }
+        #nearbySpots {
+            margin-bottom: 30px;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+            margin: 20px 0;
+        }
+
+        /* 折り畳み用のスタイル */
+        details {
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        details summary {
+            font-size: 18px;
+            font-weight: bold;
+            color: #5c85d6;
+        }
+        details[open] summary {
+            color: #ff6f61;
+        }
+
+        /* マーカのラベル用のCSS */
+        .marker-label {
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            background-color: #ffffff;
+            padding: 2px 5px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: absolute;
+            white-space: nowrap;
+            transform: translate(-50%, -250%); /* ラベルをマーカの上に表示 */
+        }
+    </style>
+</head>
+<body>
+    <div class="content-wrapper">
+        <h1>正解地点と周辺飲食店・観光地紹介！</h1>
+        <!-- <h2>Total Score: <strong id="total-score"></strong>点です！</h2>
+        <div class="rank" id="rank"></div> -->
+        
+        <!-- 地図を表示するためのDiv -->
+        <div id="map"></div>
+
+        <div id="nearbySpots">
+            <h2>観光スポットや飲食店のおすすめ:</h2>
+            <!-- 各ラウンドごとに折り畳み表示 -->
+            <details id="round1-details">
+                <summary>Round 1 の周辺スポット</summary>
+                <div id="round1-spots"></div>
+            </details>
+
+            <details id="round2-details">
+                <summary>Round 2 の周辺スポット</summary>
+                <div id="round2-spots"></div>
+            </details>
+
+            <details id="round3-details">
+                <summary>Round 3 の周辺スポット</summary>
+                <div id="round3-spots"></div>
+            </details>
+
+            <details id="round4-details">
+                <summary>Round 4 の周辺スポット</summary>
+                <div id="round4-spots"></div>
+            </details>
+
+            <details id="round5-details">
+                <summary>Round 5 の周辺スポット</summary>
+                <div id="round5-spots"></div>
+            </details>
+        </div>
+    </div>
+
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBXskYss6vmHiYblfLtD2kpuY-ELrHRr2c&libraries=places&callback=initMap"></script>
+
+    <script>
+        // const totalScore = sessionStorage.getItem('totalScore');
+
+        // // SessionStorageからスコアを取得
+        // document.getElementById('total-score').textContent = totalScore;
+        // const rankElement = document.getElementById('rank');
+        
+        // if (totalScore >= 10001) {
+        //     rankElement.textContent = 'ランク1: あなたは真の福岡市マスターです！';
+        //     rankElement.classList.add('rank1');
+        // } else if (totalScore >= 101 && totalScore <= 10000) {
+        //     rankElement.textContent = 'ランク2: 福岡市をよく知っていますね！';
+        //     rankElement.classList.add('rank2');
+        // } else if (totalScore >= 5 && totalScore <= 100) {
+        //     rankElement.textContent = 'ランク3: もっと福岡市を探索しましょう！';
+        //     rankElement.classList.add('rank3');
+        // }
+
+        let map;
+        let randomMarkers = [];  // ランダムに選ばれた地点のマーカー
+        let spotMarkers = [];    // お店などのスポットマーカー
+
+        const locations = [
+            JSON.parse(sessionStorage.getItem('round1_location')),
+            JSON.parse(sessionStorage.getItem('round2_location')),
+            JSON.parse(sessionStorage.getItem('round3_location')),
+            JSON.parse(sessionStorage.getItem('round4_location')),
+            JSON.parse(sessionStorage.getItem('round5_location'))
+        ];
+
+        function initMap() {
+            // マップの初期化
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 33.5902, lng: 130.4017 },
+                zoom: 11
+            });
+
+            // 5つのランダムな地点にマーカーを設置（Round 1～5のラベルを表示）
+            locations.forEach((location, index) => {
+                const marker = new google.maps.Marker({
+                    position: location,
+                    map: map,
+                    title: `Round ${index + 1}`,
+                    icon: {
+                        url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                    }
+                });
+                randomMarkers.push(marker);
+
+                // ラベルをマーカーの上にカスタム配置するためのオーバーレイ
+                const labelDiv = document.createElement('div');
+                labelDiv.className = 'marker-label';
+                labelDiv.innerHTML = `Round ${index + 1}`;
+                
+                const labelOverlay = new google.maps.OverlayView();
+                labelOverlay.onAdd = function() {
+                    const panes = this.getPanes();
+                    panes.overlayImage.appendChild(labelDiv);
+                };
+                labelOverlay.draw = function() {
+                    const projection = this.getProjection();
+                    const position = projection.fromLatLngToDivPixel(marker.getPosition());
+                    labelDiv.style.left = `${position.x}px`;
+                    labelDiv.style.top = `${position.y}px`;  // マーカーの上に配置
+                };
+                labelOverlay.setMap(map);
+            });
+
+            // 各ラウンドごとにスポット情報を検索して表示
+            searchNearbySpots(0, 'round1-spots', 'restaurant', 'おすすめスポット');
+            searchNearbySpots(1, 'round2-spots', 'restaurant', 'おすすめスポット');
+            searchNearbySpots(2, 'round3-spots', 'restaurant', 'おすすめスポット');
+            searchNearbySpots(3, 'round4-spots', 'restaurant', 'おすすめスポット');
+            searchNearbySpots(4, 'round5-spots', 'restaurant', 'おすすめスポット');
+        }
+
+        // 指定されたラウンドに基づいて周辺施設を検索し、表示
+        function searchNearbySpots(index, spotElementId, type1, type2) {
+            const location = locations[index];
+            searchNearby(location, type1, spotElementId, 'blue');
+            searchNearbyByKeyword(location, type2, spotElementId, 'green');
+        }
+
+        // 周辺の飲食店を検索する関数
+        function searchNearby(location, type, spotElementId, color) {
+            const service = new google.maps.places.PlacesService(map);
+            const request = {
+                location: location,
+                radius: 1000,  // 1000m以内
+                type: [type]  // カテゴリにもとづく検索
+            };
+
+            service.nearbySearch(request, function(results, status) {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                    const spotElement = document.getElementById(spotElementId);
+                    
+                    
+                    
+                    for (let i = 0; i < Math.min(results.length, 3); i++) {
+                        const place = results[i];
+
+                        
+                        const marker = new google.maps.Marker({
+                            position: place.geometry.location,
+                            map: map,
+                            icon: {
+                                url: `http://maps.google.com/mapfiles/ms/icons/${color}-dot.png`
+                            }
+                        });
+                        spotMarkers.push(marker);
+
+                        const spotDiv = document.createElement('div');
+                        spotDiv.classList.add('spot-info');
+                        
+                        // 施設に写真がある場合、その写真を表示
+                        let photoHtml = '';
+                        if (place.photos && place.photos.length > 0) {
+                            const photoUrl = place.photos[0].getUrl({maxWidth: 400});
+                            photoHtml = `<img src="${photoUrl}" alt="${place.name}" class="spot-image">`;
+                        }
+                        
+                        
+                        spotDiv.innerHTML = `
+                            <span class="rating">評価: ${place.rating || 'なし'}/ 5</span> 
+                            <h3>${place.name}</h3>
+                            ${photoHtml}
+                            <p>${place.vicinity}</p>
+                            
+                        `;
+                        spotElement.appendChild(spotDiv);
+                    }
+                }
+            });
+        }
+
+        // キーワードを基に検索する関数
+        function searchNearbyByKeyword(location, keyword, spotElementId, color) {
+            const service = new google.maps.places.PlacesService(map);
+            const request = {
+                location: location,
+                radius: 1000,  // 1000m以内
+                keyword: keyword  // キーワード
+            };
+
+            service.nearbySearch(request, function(results, status) {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                    const spotElement = document.getElementById(spotElementId);
+                    
+                    
+                    for (let i = 0; i < Math.min(results.length, 3); i++) {
+                        const place = results[i];
+                    
+                    
+                        const marker = new google.maps.Marker({
+                            position: place.geometry.location,
+                            map: map,
+                            icon: {
+                                url: `http://maps.google.com/mapfiles/ms/icons/${color}-dot.png`
+                            }
+                        });
+                        spotMarkers.push(marker);
+
+                        const spotDiv = document.createElement('div');
+                        spotDiv.classList.add('spot-info');
+
+                        let photoHtml = '';
+                        if (place.photos && place.photos.length > 0) {
+                            const photoUrl = place.photos[0].getUrl({maxWidth: 400});
+                            photoHtml = `<img src="${photoUrl}" alt="${place.name}" class="spot-image">`;
+                        }
+
+                        spotDiv.innerHTML = `
+                            <span class="rating">評価: ${place.rating || 'なし'}/ 5</span>
+                            <h3>${place.name}</h3>
+                            ${photoHtml}
+                            <p>${place.vicinity}</p>
+                            
+                        `;
+                        spotElement.appendChild(spotDiv);
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
